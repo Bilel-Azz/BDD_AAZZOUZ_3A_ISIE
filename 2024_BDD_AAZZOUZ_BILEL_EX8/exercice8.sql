@@ -15,68 +15,69 @@ ADD FOREIGN KEY (ID_Disponibilite) REFERENCES Disponibilite(ID_Disponibilite);
 -- Déclencheur avant l'insertion pour vérifier la disponibilité du matériel
 DELIMITER //
 
+CREATE TRIGGER Before_Reservation_Insert
+BEFORE INSERT ON Reservation
+FOR EACH ROW
+BEGIN
+    DECLARE AvailCount INT;
+    SELECT COUNT(*)
+    INTO AvailCount
+    FROM Disponibilite
+    WHERE ID_Materiel = NEW.Materiel_ID
+    AND NEW.DateDebutReservation BETWEEN DateDebut AND DateFin
+    AND NEW.DateFinReservation BETWEEN DateDebut AND DateFin;
+    
+    IF AvailCount = 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Le matériel n''est pas disponible pendant cette période.';
+    END IF;
+END//
+
+DELIMITER ;
+
+-- Déclencheur avant la mise à jour pour vérifier la disponibilité du matériel
+
+DELIMITER $$
+
 CREATE TRIGGER Before_Disponibilite_Update 
 BEFORE UPDATE ON Disponibilite
 FOR EACH ROW
 BEGIN
-    DECLARE Reservation_Count INT;
-    SET Reservation_Count = (
-        SELECT COUNT(*)
-        FROM Reservation
-        WHERE Materiel_ID = NEW.ID_Materiel
-        AND (
-            (NEW.DateDebut BETWEEN DateDebutReservation AND DateFinReservation)
-            OR (NEW.DateFin BETWEEN DateDebutReservation AND DateFinReservation)
-            OR (NEW.DateDebut <= DateDebutReservation AND NEW.DateFin >= DateFinReservation)
-        )
-    );
-    IF Reservation_Count > 0 THEN
+    DECLARE ResCount INT;
+    SELECT COUNT(*) INTO ResCount FROM Reservation
+    WHERE Materiel_ID = NEW.ID_Materiel
+    AND (NEW.DateDebut BETWEEN DateDebutReservation AND DateFinReservation
+        OR NEW.DateFin BETWEEN DateDebutReservation AND DateFinReservation
+        OR (NEW.DateDebut <= DateDebutReservation AND NEW.DateFin >= DateFinReservation));
+    
+    IF ResCount > 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'La nouvelle période de disponibilité se chevauche avec des réservations existantes.';
     END IF;
-END //
+END $$
 
 DELIMITER ;
 
 
+-- Déclencheur avant la suppression pour vérifier les réservations associées
 
--- Déclencheur avant la mise à jour de la disponibilité
-DELIMITER //
+
+
+DELIMITER $$
 
 CREATE TRIGGER Before_Disponibilite_Delete 
 BEFORE DELETE ON Disponibilite
 FOR EACH ROW
 BEGIN
-    DECLARE Reservation_Count INT;
-    SET Reservation_Count = (
-        SELECT COUNT(*)
-        FROM Reservation
-        WHERE ID_Disponibilite = OLD.ID_Disponibilite
-    );
-    IF Reservation_Count > 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Impossible de supprimer cette disponibilité car elle est associée à des réservations existantes.';
-    END IF;
-END //
-
-DELIMITER ;
-
--- Déclencheur avant suppression de la disponibilité
-DELIMITER $$
-
-CREATE TRIGGER Before_Disponibilite_Delete BEFORE DELETE ON Disponibilite
-FOR EACH ROW
-BEGIN
-    DECLARE Reservation_Count INT;
-    SET Reservation_Count = (
-        SELECT COUNT(*)
-        FROM Reservation
-        WHERE ID_Disponibilite = OLD.ID_Disponibilite
-    );
-    IF Reservation_Count > 0 THEN
+    DECLARE ResCount INT;
+    SELECT COUNT(*) INTO ResCount FROM Reservation
+    WHERE ID_Disponibilite = OLD.ID_Disponibilite;
+    
+    IF ResCount > 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Impossible de supprimer cette disponibilité car elle est associée à des réservations existantes.';
     END IF;
 END $$
 
 DELIMITER ;
+
 
 -- Tests pour vérifier les conditions
 

@@ -28,7 +28,7 @@ BEGIN
     AND NEW.DateFinReservation BETWEEN DateDebut AND DateFin;
     
     IF AvailCount = 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Le matériel n''est pas disponible pendant cette période.';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Le matériel n''est pas dispo pour cette période.';
     END IF;
 END//
 
